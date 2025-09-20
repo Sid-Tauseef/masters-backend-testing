@@ -37,67 +37,95 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// Enhanced CORS Configuration for server.js
-const allowedOrigins = [
-  'https://masters-frontend-testing.vercel.app',
-  'https://masters-backend-testing-r6vw.vercel.app', // ← Add your backend domain
-  /^https:\/\/masters-frontend-testing.*\.vercel\.app$/, // Frontend preview deployments
-  /^https:\/\/masters-backend-testing.*\.vercel\.app$/, // Backend preview deployments
-  'http://localhost:3000',
-  'http://localhost:5173',
-];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      console.log(`🔍 Request origin: ${origin}`);
-      
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) {
-        console.log('✅ No origin - allowing');
-        return callback(null, true);
-      }
-      
-      // Check allowed origins
-      const isAllowed = allowedOrigins.some(allowedOrigin => {
-        if (typeof allowedOrigin === 'string') {
-          return allowedOrigin === origin;
-        }
-        if (allowedOrigin instanceof RegExp) {
-          return allowedOrigin.test(origin);
-        }
-        return false;
-      });
-      
-      if (isAllowed) {
-        console.log(`✅ Origin allowed: ${origin}`);
-        return callback(null, true);
-      }
-      
-      console.warn(`❌ CORS blocked request from: ${origin}`);
-      return callback(new Error(`CORS blocked: ${origin} not allowed`), false);
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
-      'X-Requested-With',
-      'Accept',
-      'Origin'
-    ],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-  })
-);
-
-// Handle preflight requests explicitly
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
+// ✅ EXPLICIT CORS MIDDLEWARE (PRIORITY - RUNS FIRST)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  const allowedOrigins = [
+    'https://masters-frontend-testing.vercel.app',
+    'https://masters-backend-testing-r6vw.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  
+  // Check if origin is allowed
+  const isAllowed = allowedOrigins.includes(origin) || 
+                   /^https:\/\/masters-frontend-testing.*\.vercel\.app$/.test(origin) ||
+                   /^https:\/\/masters-backend-testing.*\.vercel\.app$/.test(origin);
+  
+  if (isAllowed || !origin) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+  }
+  
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(204);
+  res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+  
+  // Handle preflight OPTIONS request
+  if (req.method === 'OPTIONS') {
+    console.log(`✅ Handling OPTIONS preflight from: ${origin}`);
+    return res.status(204).end();
+  }
+  
+  console.log(`🔄 Request: ${req.method} ${req.path} from: ${origin}`);
+  next();
+});
+
+// ✅ BACKUP CORS CONFIGURATION
+const corsOptions = {
+  origin: function (origin, callback) {
+    console.log(`🔍 CORS check for origin: ${origin}`);
+    
+    const allowedOrigins = [
+      'https://masters-frontend-testing.vercel.app',
+      'https://masters-backend-testing-r6vw.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:5173'
+    ];
+    
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
+      console.log('✅ No origin - allowing');
+      return callback(null, true);
+    }
+    
+    // Check exact matches
+    if (allowedOrigins.includes(origin)) {
+      console.log(`✅ Exact match allowed: ${origin}`);
+      return callback(null, true);
+    }
+    
+    // Check regex patterns for preview deployments
+    if (/^https:\/\/masters-frontend-testing.*\.vercel\.app$/.test(origin) ||
+        /^https:\/\/masters-backend-testing.*\.vercel\.app$/.test(origin)) {
+      console.log(`✅ Preview deployment allowed: ${origin}`);
+      return callback(null, true);
+    }
+    
+    console.warn(`❌ CORS blocked: ${origin}`);
+    callback(null, false); // Don't throw error, just deny
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+  preflightContinue: false
+};
+
+app.use(cors(corsOptions));
+
+// Explicit OPTIONS handler as additional backup
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  console.log(`🔧 Explicit OPTIONS handler for: ${origin}`);
+  
+  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  res.status(204).send();
 });
 
 // Rate limiting (reduced for serverless)
@@ -126,14 +154,16 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     message: 'Masters Academy API is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    cors: 'enabled'
   });
 });
 
 app.get('/', (req, res) => {
   res.status(200).json({
     message: 'Masters Academy API',
-    status: 'running'
+    status: 'running',
+    cors: 'enabled'
   });
 });
 
@@ -153,7 +183,7 @@ app.use(errorHandler);
 app.use((err, req, res, next) => {
   console.error('❌ Unhandled error:', err);
   
-  if (err.message.includes('CORS blocked')) {
+  if (err.message && err.message.includes('CORS')) {
     return res.status(403).json({
       error: 'CORS Error',
       message: 'Request blocked by CORS policy'
