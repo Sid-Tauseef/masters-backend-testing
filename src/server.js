@@ -37,16 +37,15 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// ✅ Enhanced CORS Configuration
+// Enhanced CORS Configuration for server.js
 const allowedOrigins = [
   'https://masters-frontend-testing.vercel.app',
-  'https://masters-frontend-testing-git-main-your-username.vercel.app', // Add your actual git branch URL
+  'https://masters-backend-testing-r6vw.vercel.app', // ← Add your backend domain
+  /^https:\/\/masters-frontend-testing.*\.vercel\.app$/, // Frontend preview deployments
+  /^https:\/\/masters-backend-testing.*\.vercel\.app$/, // Backend preview deployments
   'http://localhost:3000',
   'http://localhost:5173',
 ];
-
-// Regex for Vercel preview deployments
-const vercelRegex = /^https:\/\/masters-frontend-testing.*\.vercel\.app$/;
 
 app.use(
   cors({
@@ -60,7 +59,17 @@ app.use(
       }
       
       // Check allowed origins
-      if (allowedOrigins.includes(origin) || vercelRegex.test(origin)) {
+      const isAllowed = allowedOrigins.some(allowedOrigin => {
+        if (typeof allowedOrigin === 'string') {
+          return allowedOrigin === origin;
+        }
+        if (allowedOrigin instanceof RegExp) {
+          return allowedOrigin.test(origin);
+        }
+        return false;
+      });
+      
+      if (isAllowed) {
         console.log(`✅ Origin allowed: ${origin}`);
         return callback(null, true);
       }
