@@ -25,7 +25,7 @@ connectDB();
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://masters-academy.vercel.app']  // Replace with your actual frontend Vercel URL
+    ? ['https://masters-frontend-testing.vercel.app/']  // Replace with your actual frontend Vercel URL
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true
 }));
