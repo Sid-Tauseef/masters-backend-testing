@@ -40,7 +40,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// ✅ MANUAL CORS MIDDLEWARE - RUNS FIRST
+// ✅ DIRECT CORS HEADERS - Replace the CORS middleware in server.js
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   console.log(`🔍 CORS Request: ${req.method} ${req.url} from origin: ${origin || 'no-origin'}`);
@@ -65,11 +65,14 @@ app.use((req, res, next) => {
     const allowOrigin = origin || 'https://masters-frontend-testing.vercel.app';
     console.log(`✅ Setting CORS headers for origin: ${allowOrigin}`);
     
-    res.header('Access-Control-Allow-Origin', allowOrigin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Max-Age', '86400');
+    // Use more direct header setting
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    
+    console.log(`📤 CORS headers set for: ${allowOrigin}`);
   } else {
     console.log(`❌ CORS blocked origin: ${origin}`);
   }
@@ -77,7 +80,22 @@ app.use((req, res, next) => {
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
     console.log(`🔧 Handling OPTIONS preflight from: ${origin}`);
-    return res.status(204).end();
+    
+    // Send response immediately with explicit headers
+    if (isAllowed) {
+      const allowOrigin = origin || 'https://masters-frontend-testing.vercel.app';
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept, Origin',
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Max-Age': '86400'
+      });
+      console.log(`✅ OPTIONS response sent with CORS headers for: ${allowOrigin}`);
+      return res.end();
+    } else {
+      return res.status(403).end();
+    }
   }
   
   next();
