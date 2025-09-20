@@ -27,9 +27,9 @@ app.use(helmet());
 // Configure CORS
 
 const allowedOrigins = [
-  'https://masters-frontend-testing.vercel.app', // NO TRAILING SPACES!
-  'http://localhost:3000',
-  'http://localhost:5173',
+  'https://masters-frontend-testing.vercel.app/', // NO TRAILING SPACES!
+  'https://masters-frontend-testing-git-main-tauseefs-projects-0fb890a8.vercel.app/',
+  'https://masters-frontend-testing-gqrxvhfxs-tauseefs-projects-0fb890a8.vercel.app/',
 ];
 // backend\src\server.js
 app.use(cors({
