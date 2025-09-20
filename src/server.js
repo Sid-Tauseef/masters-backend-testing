@@ -16,6 +16,9 @@ const { errorHandler } = require('./middlewares/errorMiddleware');
 
 const app = express();
 
+// ✅ TRUST PROXY - CRITICAL FOR VERCEL
+app.set('trust proxy', 1);
+
 // Initialize database connection
 const connectDB = require('./config/db');
 let dbConnected = false;
@@ -27,7 +30,7 @@ const initializeDB = async () => {
       dbConnected = true;
       console.log('✅ Database connected');
     } catch (error) {
-      console.error('❌ Database connection failed:', error);
+      console.error('❌ Database connection failed:', error.message);
     }
   }
 };
@@ -37,9 +40,10 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// ✅ EXPLICIT CORS MIDDLEWARE (PRIORITY - RUNS FIRST)
+// ✅ MANUAL CORS MIDDLEWARE - RUNS FIRST
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  console.log(`🔍 CORS Request: ${req.method} ${req.url} from origin: ${origin || 'no-origin'}`);
   
   const allowedOrigins = [
     'https://masters-frontend-testing.vercel.app',
@@ -49,93 +53,53 @@ app.use((req, res, next) => {
   ];
   
   // Check if origin is allowed
-  const isAllowed = allowedOrigins.includes(origin) || 
-                   /^https:\/\/masters-frontend-testing.*\.vercel\.app$/.test(origin) ||
-                   /^https:\/\/masters-backend-testing.*\.vercel\.app$/.test(origin);
+  const isExactMatch = allowedOrigins.includes(origin);
+  const isPreviewMatch = origin && (
+    /^https:\/\/masters-frontend-testing.*\.vercel\.app$/.test(origin) ||
+    /^https:\/\/masters-backend-testing.*\.vercel\.app$/.test(origin)
+  );
   
-  if (isAllowed || !origin) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
+  const isAllowed = isExactMatch || isPreviewMatch || !origin;
+  
+  if (isAllowed) {
+    const allowOrigin = origin || 'https://masters-frontend-testing.vercel.app';
+    console.log(`✅ Setting CORS headers for origin: ${allowOrigin}`);
+    
+    res.header('Access-Control-Allow-Origin', allowOrigin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+  } else {
+    console.log(`❌ CORS blocked origin: ${origin}`);
   }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
   
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    console.log(`✅ Handling OPTIONS preflight from: ${origin}`);
+    console.log(`🔧 Handling OPTIONS preflight from: ${origin}`);
     return res.status(204).end();
   }
   
-  console.log(`🔄 Request: ${req.method} ${req.path} from: ${origin}`);
   next();
 });
 
-// ✅ BACKUP CORS CONFIGURATION
-const corsOptions = {
-  origin: function (origin, callback) {
-    console.log(`🔍 CORS check for origin: ${origin}`);
-    
-    const allowedOrigins = [
-      'https://masters-frontend-testing.vercel.app',
-      'https://masters-backend-testing-r6vw.vercel.app',
-      'http://localhost:3000',
-      'http://localhost:5173'
-    ];
-    
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) {
-      console.log('✅ No origin - allowing');
-      return callback(null, true);
-    }
-    
-    // Check exact matches
-    if (allowedOrigins.includes(origin)) {
-      console.log(`✅ Exact match allowed: ${origin}`);
-      return callback(null, true);
-    }
-    
-    // Check regex patterns for preview deployments
-    if (/^https:\/\/masters-frontend-testing.*\.vercel\.app$/.test(origin) ||
-        /^https:\/\/masters-backend-testing.*\.vercel\.app$/.test(origin)) {
-      console.log(`✅ Preview deployment allowed: ${origin}`);
-      return callback(null, true);
-    }
-    
-    console.warn(`❌ CORS blocked: ${origin}`);
-    callback(null, false); // Don't throw error, just deny
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  credentials: true,
-  optionsSuccessStatus: 204,
-  preflightContinue: false
-};
-
-app.use(cors(corsOptions));
-
-// Explicit OPTIONS handler as additional backup
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  console.log(`🔧 Explicit OPTIONS handler for: ${origin}`);
-  
-  res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  res.status(204).send();
-});
-
-// Rate limiting (reduced for serverless)
+// Rate limiting - Fixed for Vercel
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Increased for serverless
+  windowMs: 15 * 60 * 1000,
+  max: 200,
   message: { error: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+  // Fix for Vercel proxy headers
+  skip: (req) => {
+    // Skip rate limiting if there are proxy header issues
+    return false;
+  },
+  keyGenerator: (req) => {
+    return req.ip || 'anonymous';
+  }
 });
+
 app.use(limiter);
 
 // Body parsing middleware
@@ -148,22 +112,26 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Health check endpoint (should be first)
+// Health check endpoint
 app.get('/api/health', (req, res) => {
+  console.log('🩺 Health check called');
   res.status(200).json({
     status: 'OK',
     message: 'Masters Academy API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    cors: 'enabled'
+    cors: 'enabled',
+    version: '2.0'
   });
 });
 
 app.get('/', (req, res) => {
+  console.log('🏠 Root endpoint called');
   res.status(200).json({
     message: 'Masters Academy API',
     status: 'running',
-    cors: 'enabled'
+    cors: 'enabled',
+    version: '2.0'
   });
 });
 
@@ -179,16 +147,9 @@ app.use('/api/gallery', galleryRoutes);
 // Error handling middleware
 app.use(errorHandler);
 
-// Global error handler for unhandled errors
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error('❌ Unhandled error:', err);
-  
-  if (err.message && err.message.includes('CORS')) {
-    return res.status(403).json({
-      error: 'CORS Error',
-      message: 'Request blocked by CORS policy'
-    });
-  }
+  console.error('❌ Unhandled error:', err.message);
   
   res.status(500).json({
     error: 'Internal Server Error',
