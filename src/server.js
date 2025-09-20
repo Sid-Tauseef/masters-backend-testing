@@ -25,26 +25,32 @@ connectDB();
 app.use(helmet());
 
 // Configure CORS
+
 const allowedOrigins = [
-  'https://masters-frontend-testing.vercel.app', // No trailing slash
-  'http://localhost:3000', // For local dev
-  'http://localhost:5173', // For Vite dev server
+  'https://masters-frontend-testing.vercel.app', // NO TRAILING SPACES!
+  'http://localhost:3000',
+  'http://localhost:5173',
 ];
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., mobile apps or curl)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  })
-);
+// backend\src\server.js
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      // For preflight requests, we need to send proper CORS headers even for rejected origins
+      const err = new Error('Not allowed by CORS');
+      err.status = 403;
+      callback(err);
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
 
 // Rate limiting
 const limiter = rateLimit({
