@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "src/server.js",
+      "rateLimit": {
+        "windowMs": 900000,
+        "max": 100
+      }
+    }
+  ]
+}
