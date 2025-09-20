@@ -9,11 +9,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "src/server.js",
-      "rateLimit": {
-        "windowMs": 900000,
-        "max": 100
-      }
+      "dest": "src/server.js"
     }
   ]
 }
