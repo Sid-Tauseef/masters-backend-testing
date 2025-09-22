@@ -20,12 +20,12 @@ const connectDB = async () => {
 
 const seedAdmin = async () => {
   try {
-    const adminExists = await Admin.findOne({ email: 'admin@radianceacademy.com' });
+    const adminExists = await Admin.findOne({ email: 'admin@mastersacademy.com' });
     
     if (!adminExists) {
       await Admin.create({
         name: 'Admin',
-        email: 'admin@radianceacademy.com',
+        email: 'admin@mastersacademy.com',
         password: 'admin123',
         role: 'super-admin',
         permissions: ['courses', 'toppers', 'achievements', 'gallery', 'contacts', 'home', 'users']
@@ -350,7 +350,7 @@ const seedAll = async () => {
   
   console.log('✅ Database seeding completed!');
   console.log('\n📋 Default Admin Credentials:');
-  console.log('Email: admin@radianceacademy.com');
+  console.log('Email: admin@mastersacademy.com');
   console.log('Password: admin123');
   console.log('\n⚠️ Please change these credentials in production!');
   

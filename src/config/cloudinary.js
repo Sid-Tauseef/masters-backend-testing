@@ -13,7 +13,7 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'radiance-academy',
+    folder: 'masters-academy',
     allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
     transformation: [
       { width: 1200, height: 800, crop: 'limit', quality: 'auto' }
