@@ -132,6 +132,17 @@ const createCourse = async (req, res) => {
 // @access  Private
 const updateCourse = async (req, res) => {
   try {
+    console.log('🔍 Update course request received:', {
+      params: req.params,
+      body: req.body,
+      file: req.file ? {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        path: req.file.path
+      } : 'No file'
+    })
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -140,6 +151,7 @@ const updateCourse = async (req, res) => {
         errors: errors.array()
       });
     }
+
     const course = await Course.findById(req.params.id);
     if (!course) {
       return res.status(404).json({
@@ -147,10 +159,14 @@ const updateCourse = async (req, res) => {
         message: 'Course not found'
       });
     }
-    const updateData = req.body;
+
+    const updateData = { ...req.body };
+    
+    console.log('📝 Initial update data:', updateData)
     
     // FIX: Handle empty image object
     if (updateData.image && typeof updateData.image === 'object' && Object.keys(updateData.image).length === 0) {
+      console.log('🔄 Removing empty image object')
       delete updateData.image;
     }
     
@@ -158,10 +174,13 @@ const updateCourse = async (req, res) => {
     if (updateData.features && typeof updateData.features === 'string') {
       try {
         updateData.features = JSON.parse(updateData.features);
+        console.log('✅ Parsed features:', updateData.features)
       } catch (error) {
+        console.log('❌ Error parsing features:', error)
         updateData.features = [];
       }
     }
+
     if (updateData.syllabus && typeof updateData.syllabus === 'string') {
       try {
         updateData.syllabus = JSON.parse(updateData.syllabus);
@@ -169,38 +188,57 @@ const updateCourse = async (req, res) => {
         updateData.syllabus = [];
       }
     }
+
     if (updateData.instructor && typeof updateData.instructor === 'string') {
       try {
         updateData.instructor = JSON.parse(updateData.instructor);
+        console.log('✅ Parsed instructor:', updateData.instructor)
       } catch (error) {
+        console.log('❌ Error parsing instructor:', error)
         updateData.instructor = {};
       }
     }
+
     // Handle image upload
     if (req.file) {
+      console.log('🖼️ New image detected, processing...')
+      console.log('Old image URL:', course.image)
+      console.log('New image path:', req.file.path)
+      
       // Delete old image from Cloudinary
       if (course.image) {
         try {
           const publicId = extractPublicId(course.image);
+          console.log('🗑️ Deleting old image with publicId:', publicId)
           await deleteImage(publicId);
+          console.log('✅ Old image deleted successfully')
         } catch (error) {
-          console.error('Error deleting old image:', error);
+          console.error('❌ Error deleting old image:', error)
         }
       }
       updateData.image = req.file.path;
+      console.log('✅ New image URL set:', updateData.image)
+    } else {
+      console.log('ℹ️ No new image file in request')
     }
+
+    console.log('📤 Final update data:', updateData)
+
     const updatedCourse = await Course.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
     );
+
+    console.log('✅ Course updated successfully:', updatedCourse._id)
+
     res.json({
       success: true,
       message: 'Course updated successfully',
       data: updatedCourse
     });
   } catch (error) {
-    console.error('Update course error:', error);
+    console.error('❌ Update course error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error while updating course'
