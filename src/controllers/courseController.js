@@ -94,13 +94,7 @@ const createCourse = async (req, res) => {
         courseData.features = [];
       }
     }
-    if (courseData.syllabus && typeof courseData.syllabus === 'string') {
-      try {
-        courseData.syllabus = JSON.parse(courseData.syllabus);
-      } catch (error) {
-        courseData.syllabus = [];
-      }
-    }
+    // Removed syllabus parsing - not in model or form
     if (courseData.instructor && typeof courseData.instructor === 'string') {
       try {
         courseData.instructor = JSON.parse(courseData.instructor);
@@ -119,7 +113,16 @@ const createCourse = async (req, res) => {
       data: course
     });
   } catch (error) {
-    console.error('Create course error:', error);
+    console.error('Create course error:', error.message); // Better logging
+    if (error.name === 'ValidationError') {
+      // Handle Mongoose validation specifically
+      const messages = Object.values(error.errors).map(err => err.message).join(', ');
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: messages
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Server error while creating course'
@@ -181,14 +184,7 @@ const updateCourse = async (req, res) => {
       }
     }
 
-    if (updateData.syllabus && typeof updateData.syllabus === 'string') {
-      try {
-        updateData.syllabus = JSON.parse(updateData.syllabus);
-      } catch (error) {
-        updateData.syllabus = [];
-      }
-    }
-
+    // Removed syllabus parsing - not in model or form
     if (updateData.instructor && typeof updateData.instructor === 'string') {
       try {
         updateData.instructor = JSON.parse(updateData.instructor);
@@ -238,7 +234,16 @@ const updateCourse = async (req, res) => {
       data: updatedCourse
     });
   } catch (error) {
-    console.error('❌ Update course error:', error);
+    console.error('Update course error:', error.message); // Better logging
+    if (error.name === 'ValidationError') {
+      // Handle Mongoose validation specifically
+      const messages = Object.values(error.errors).map(err => err.message).join(', ');
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: messages
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Server error while updating course'
