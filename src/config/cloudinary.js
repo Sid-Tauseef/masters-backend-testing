@@ -2,9 +2,9 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
-// Validate Cloudinary config
+// Validate Cloudinary config early
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-  console.error('❌ Cloudinary configuration missing. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.');
+  console.error('❌ Cloudinary configuration missing/incomplete. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in Vercel env vars.');
 }
 
 // Configure Cloudinary
@@ -12,6 +12,15 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Test config (optional, logs on startup)
+cloudinary.api.ping((error, result) => {
+  if (error) {
+    console.error('❌ Cloudinary ping failed:', error.message);
+  } else {
+    console.log('✅ Cloudinary connected:', result);
+  }
 });
 
 // Configure Cloudinary storage for multer

@@ -102,23 +102,31 @@ const createCourse = async (req, res) => {
       }
     }
     // Handle image upload with strict validation
+    console.log('req.file exists?', !!req.file); // Always log presence
     if (req.file) {
       console.log('Full req.file object:', JSON.stringify(req.file, null, 2)); // Full debug log
-      // Strict check for valid Cloudinary path
+      // Strict check for empty object or invalid path
+      if (!req.file || Object.keys(req.file).length === 0) {
+        console.error('Empty req.file object received');
+        return res.status(400).json({
+          success: false,
+          message: 'Empty file uploaded - Cloudinary failure. Check env vars and redeploy.'
+        });
+      }
       if (!req.file.path || 
           typeof req.file.path !== 'string' || 
           req.file.path.length === 0 || 
-          !req.file.path.includes('res.cloudinary.com')) { // Ensure it's a Cloudinary URL
+          !req.file.path.includes('res.cloudinary.com')) { // Ensure Cloudinary URL
         console.error('Invalid uploaded file - no valid path:', req.file);
         return res.status(400).json({
           success: false,
-          message: 'Image upload to Cloudinary failed. Check file size/format and try again (max 5MB, JPG/PNG).'
+          message: 'Image upload to Cloudinary failed. Check file size/format and env vars (max 5MB, JPG/PNG).'
         });
       }
       courseData.image = req.file.path;
       console.log('Valid image set:', courseData.image);
     } else {
-      console.log('No req.file present');
+      console.log('No req.file present - skipping image');
     }
     // If no image, Mongoose will validate required below
     const course = await Course.create(courseData);
@@ -214,12 +222,20 @@ const updateCourse = async (req, res) => {
     }
 
     // Handle image upload with strict validation
+    console.log('req.file exists for update?', !!req.file); // Always log presence
     if (req.file) {
       console.log('Full req.file object for update:', JSON.stringify(req.file, null, 2)); // Full debug log
       console.log('Old image URL:', course.image)
       console.log('New image path:', req.file.path)
       
-      // Strict check for valid Cloudinary path
+      // Strict check for empty object or invalid path
+      if (!req.file || Object.keys(req.file).length === 0) {
+        console.error('Empty req.file object received for update');
+        return res.status(400).json({
+          success: false,
+          message: 'Empty file uploaded - Cloudinary failure. Check env vars and redeploy.'
+        });
+      }
       if (!req.file.path || 
           typeof req.file.path !== 'string' || 
           req.file.path.length === 0 || 
@@ -227,7 +243,7 @@ const updateCourse = async (req, res) => {
         console.error('Invalid uploaded file for update - no valid path:', req.file);
         return res.status(400).json({
           success: false,
-          message: 'Image upload to Cloudinary failed. Check file size/format and try again (max 5MB, JPG/PNG).'
+          message: 'Image upload to Cloudinary failed. Check file size/format and env vars (max 5MB, JPG/PNG).'
         });
       }
       
@@ -245,7 +261,7 @@ const updateCourse = async (req, res) => {
       updateData.image = req.file.path;
       console.log('✅ New image URL set:', updateData.image)
     } else {
-      console.log('ℹ️ No new image file in request')
+      console.log('ℹ️ No new image file in request for update')
       // Preserve existing image if no new one and not explicitly removing
       if (!updateData.hasOwnProperty('image')) {
         updateData.image = course.image;
