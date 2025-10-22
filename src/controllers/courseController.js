@@ -101,19 +101,26 @@ const createCourse = async (req, res) => {
         courseData.instructor = {};
       }
     }
-    // Handle image upload with validation
+    // Handle image upload with strict validation
     if (req.file) {
-      console.log('req.file:', req.file); // Debug log
-      if (!req.file.path || typeof req.file.path !== 'string' || req.file.path.length === 0) {
+      console.log('Full req.file object:', JSON.stringify(req.file, null, 2)); // Full debug log
+      // Strict check for valid Cloudinary path
+      if (!req.file.path || 
+          typeof req.file.path !== 'string' || 
+          req.file.path.length === 0 || 
+          !req.file.path.includes('res.cloudinary.com')) { // Ensure it's a Cloudinary URL
+        console.error('Invalid uploaded file - no valid path:', req.file);
         return res.status(400).json({
           success: false,
-          message: 'Image upload failed. Please try again.'
+          message: 'Image upload to Cloudinary failed. Check file size/format and try again (max 5MB, JPG/PNG).'
         });
       }
       courseData.image = req.file.path;
-      console.log('Set image to:', courseData.image); // Debug log
+      console.log('Valid image set:', courseData.image);
+    } else {
+      console.log('No req.file present');
     }
-    // No image set? Mongoose will catch required validation below
+    // If no image, Mongoose will validate required below
     const course = await Course.create(courseData);
     res.status(201).json({
       success: true,
@@ -121,13 +128,18 @@ const createCourse = async (req, res) => {
       data: course
     });
   } catch (error) {
-    console.error('Create course error:', error.message);
+    console.error('Create course error:', error.message, error.stack);
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message).join(', ');
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
         errors: messages
+      });
+    } else if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid data format (e.g., image URL). Please check your input.'
       });
     }
     res.status(500).json({
@@ -201,17 +213,21 @@ const updateCourse = async (req, res) => {
       }
     }
 
-    // Handle image upload with validation
+    // Handle image upload with strict validation
     if (req.file) {
-      console.log('🖼️ New image detected, processing...')
-      console.log('req.file:', req.file); // Debug log
+      console.log('Full req.file object for update:', JSON.stringify(req.file, null, 2)); // Full debug log
       console.log('Old image URL:', course.image)
       console.log('New image path:', req.file.path)
       
-      if (!req.file.path || typeof req.file.path !== 'string' || req.file.path.length === 0) {
+      // Strict check for valid Cloudinary path
+      if (!req.file.path || 
+          typeof req.file.path !== 'string' || 
+          req.file.path.length === 0 || 
+          !req.file.path.includes('res.cloudinary.com')) {
+        console.error('Invalid uploaded file for update - no valid path:', req.file);
         return res.status(400).json({
           success: false,
-          message: 'Image upload failed. Please try again.'
+          message: 'Image upload to Cloudinary failed. Check file size/format and try again (max 5MB, JPG/PNG).'
         });
       }
       
@@ -230,8 +246,8 @@ const updateCourse = async (req, res) => {
       console.log('✅ New image URL set:', updateData.image)
     } else {
       console.log('ℹ️ No new image file in request')
-      // Preserve existing image if no new one
-      if (!updateData.image) {
+      // Preserve existing image if no new one and not explicitly removing
+      if (!updateData.hasOwnProperty('image')) {
         updateData.image = course.image;
       }
     }
@@ -252,13 +268,18 @@ const updateCourse = async (req, res) => {
       data: updatedCourse
     });
   } catch (error) {
-    console.error('Update course error:', error.message);
+    console.error('Update course error:', error.message, error.stack);
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message).join(', ');
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
         errors: messages
+      });
+    } else if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid data format (e.g., image URL). Please check your input.'
       });
     }
     res.status(500).json({
