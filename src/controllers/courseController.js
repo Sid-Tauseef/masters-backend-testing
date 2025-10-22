@@ -94,7 +94,6 @@ const createCourse = async (req, res) => {
         courseData.features = [];
       }
     }
-    // Removed syllabus parsing - not in model or form
     if (courseData.instructor && typeof courseData.instructor === 'string') {
       try {
         courseData.instructor = JSON.parse(courseData.instructor);
@@ -102,10 +101,19 @@ const createCourse = async (req, res) => {
         courseData.instructor = {};
       }
     }
-    // Handle image upload
+    // Handle image upload with validation
     if (req.file) {
+      console.log('req.file:', req.file); // Debug log
+      if (!req.file.path || typeof req.file.path !== 'string' || req.file.path.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Image upload failed. Please try again.'
+        });
+      }
       courseData.image = req.file.path;
+      console.log('Set image to:', courseData.image); // Debug log
     }
+    // No image set? Mongoose will catch required validation below
     const course = await Course.create(courseData);
     res.status(201).json({
       success: true,
@@ -113,9 +121,8 @@ const createCourse = async (req, res) => {
       data: course
     });
   } catch (error) {
-    console.error('Create course error:', error.message); // Better logging
+    console.error('Create course error:', error.message);
     if (error.name === 'ValidationError') {
-      // Handle Mongoose validation specifically
       const messages = Object.values(error.errors).map(err => err.message).join(', ');
       return res.status(400).json({
         success: false,
@@ -167,7 +174,7 @@ const updateCourse = async (req, res) => {
     
     console.log('📝 Initial update data:', updateData)
     
-    // FIX: Handle empty image object
+    // Handle empty image object from potential form data
     if (updateData.image && typeof updateData.image === 'object' && Object.keys(updateData.image).length === 0) {
       console.log('🔄 Removing empty image object')
       delete updateData.image;
@@ -184,7 +191,6 @@ const updateCourse = async (req, res) => {
       }
     }
 
-    // Removed syllabus parsing - not in model or form
     if (updateData.instructor && typeof updateData.instructor === 'string') {
       try {
         updateData.instructor = JSON.parse(updateData.instructor);
@@ -195,11 +201,19 @@ const updateCourse = async (req, res) => {
       }
     }
 
-    // Handle image upload
+    // Handle image upload with validation
     if (req.file) {
       console.log('🖼️ New image detected, processing...')
+      console.log('req.file:', req.file); // Debug log
       console.log('Old image URL:', course.image)
       console.log('New image path:', req.file.path)
+      
+      if (!req.file.path || typeof req.file.path !== 'string' || req.file.path.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Image upload failed. Please try again.'
+        });
+      }
       
       // Delete old image from Cloudinary
       if (course.image) {
@@ -216,6 +230,10 @@ const updateCourse = async (req, res) => {
       console.log('✅ New image URL set:', updateData.image)
     } else {
       console.log('ℹ️ No new image file in request')
+      // Preserve existing image if no new one
+      if (!updateData.image) {
+        updateData.image = course.image;
+      }
     }
 
     console.log('📤 Final update data:', updateData)
@@ -234,9 +252,8 @@ const updateCourse = async (req, res) => {
       data: updatedCourse
     });
   } catch (error) {
-    console.error('Update course error:', error.message); // Better logging
+    console.error('Update course error:', error.message);
     if (error.name === 'ValidationError') {
-      // Handle Mongoose validation specifically
       const messages = Object.values(error.errors).map(err => err.message).join(', ');
       return res.status(400).json({
         success: false,
