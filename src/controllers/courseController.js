@@ -75,11 +75,15 @@ const getCourse = async (req, res) => {
 // @desc    Create course
 // @route   POST /api/courses
 // @access  Private
-// In the createCourse function, add this debug logging:
 const createCourse = async (req, res) => {
   try {
+    console.log('🔄 CREATE COURSE STARTED');
+    console.log('📦 Request file:', req.file);
+    console.log('📝 Request body:', req.body);
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -87,18 +91,15 @@ const createCourse = async (req, res) => {
       });
     }
 
-    // DEBUG: Log the entire request to see what's coming in
-    console.log('🔍 Request body:', req.body);
-    console.log('🔍 Request file:', req.file);
-    console.log('🔍 Request headers:', req.headers);
-
-    const courseData = req.body;
+    const courseData = { ...req.body };
     
     // Parse JSON fields from FormData
     if (courseData.features && typeof courseData.features === 'string') {
       try {
         courseData.features = JSON.parse(courseData.features);
+        console.log('✅ Parsed features:', courseData.features);
       } catch (error) {
+        console.log('❌ Error parsing features:', error);
         courseData.features = [];
       }
     }
@@ -106,7 +107,9 @@ const createCourse = async (req, res) => {
     if (courseData.instructor && typeof courseData.instructor === 'string') {
       try {
         courseData.instructor = JSON.parse(courseData.instructor);
+        console.log('✅ Parsed instructor:', courseData.instructor);
       } catch (error) {
+        console.log('❌ Error parsing instructor:', error);
         courseData.instructor = {};
       }
     }
@@ -144,7 +147,8 @@ const createCourse = async (req, res) => {
       console.log('✅ Image URL set successfully:', courseData.image);
     } else {
       console.log('❌ No image file provided in req.file');
-      console.log('🔍 Available request properties:', Object.keys(req));
+      console.log('🔍 Request keys:', Object.keys(req));
+      console.log('🔍 Multer errors:', req.fileValidationError);
       return res.status(400).json({
         success: false,
         message: 'Course image is required'
@@ -152,6 +156,7 @@ const createCourse = async (req, res) => {
     }
 
     // Create course with image validation
+    console.log('📝 Final course data:', courseData);
     const course = await Course.create(courseData);
     
     console.log('✅ Course created successfully:', course._id);
@@ -162,7 +167,8 @@ const createCourse = async (req, res) => {
       data: course
     });
   } catch (error) {
-    console.error('❌ Create course error:', error.message, error.stack);
+    console.error('❌ Create course error:', error.message);
+    console.error('❌ Error stack:', error.stack);
     
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message).join(', ');
@@ -184,7 +190,6 @@ const createCourse = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Update course
 // @route   PUT /api/courses/:id

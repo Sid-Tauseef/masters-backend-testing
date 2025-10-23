@@ -2,6 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const { authMiddleware, checkPermission } = require('../middlewares/authMiddleware');
 const { upload } = require('../config/cloudinary');
+const uploadDebug = require('../middlewares/uploadDebug'); // Add debug middleware
 const {
   getCourses,
   getCourse,
@@ -46,11 +47,12 @@ const courseValidation = [
 router.get('/', getCourses);
 router.get('/:id', getCourse);
 
-// Protected routes
+// Protected routes - ADD UPLOAD DEBUG MIDDLEWARE
 router.post('/', 
   authMiddleware, 
   checkPermission('courses'),
   upload.single('image'),
+  uploadDebug, // Add debug middleware after upload
   courseValidation,
   createCourse
 );
@@ -59,6 +61,7 @@ router.put('/:id',
   authMiddleware, 
   checkPermission('courses'),
   upload.single('image'),
+  uploadDebug, // Add debug middleware after upload
   courseValidation,
   updateCourse
 );

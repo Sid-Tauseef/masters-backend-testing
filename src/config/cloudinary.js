@@ -24,7 +24,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Enhanced Cloudinary storage configuration
+// Enhanced Cloudinary storage configuration with better error handling
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -33,7 +33,6 @@ const storage = new CloudinaryStorage({
     transformation: [
       { width: 1200, height: 800, crop: 'limit', quality: 'auto' }
     ],
-    // Add timeout and error handling
     timeout: 60000
   },
 });
