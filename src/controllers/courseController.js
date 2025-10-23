@@ -75,6 +75,7 @@ const getCourse = async (req, res) => {
 // @desc    Create course
 // @route   POST /api/courses
 // @access  Private
+// In the createCourse function, add this debug logging:
 const createCourse = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -85,6 +86,11 @@ const createCourse = async (req, res) => {
         errors: errors.array()
       });
     }
+
+    // DEBUG: Log the entire request to see what's coming in
+    console.log('🔍 Request body:', req.body);
+    console.log('🔍 Request file:', req.file);
+    console.log('🔍 Request headers:', req.headers);
 
     const courseData = req.body;
     
@@ -113,7 +119,8 @@ const createCourse = async (req, res) => {
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
-        path: req.file.path
+        path: req.file.path,
+        fieldname: req.file.fieldname
       });
 
       // Validate Cloudinary response
@@ -136,7 +143,8 @@ const createCourse = async (req, res) => {
       courseData.image = req.file.path;
       console.log('✅ Image URL set successfully:', courseData.image);
     } else {
-      console.log('❌ No image file provided');
+      console.log('❌ No image file provided in req.file');
+      console.log('🔍 Available request properties:', Object.keys(req));
       return res.status(400).json({
         success: false,
         message: 'Course image is required'
@@ -176,6 +184,7 @@ const createCourse = async (req, res) => {
     });
   }
 };
+
 
 // @desc    Update course
 // @route   PUT /api/courses/:id
