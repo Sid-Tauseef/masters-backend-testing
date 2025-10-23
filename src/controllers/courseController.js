@@ -1,6 +1,6 @@
 const { validationResult } = require('express-validator');
 const Course = require('../models/Course');
-const { deleteImage, extractPublicId } = require('../config/cloudinary');
+const { deleteImage, extractPublicId, uploadToCloudinary } = require('../config/cloudinary');
 
 // @desc    Get all courses
 // @route   GET /api/courses
@@ -114,7 +114,7 @@ const createCourse = async (req, res) => {
       }
     }
 
-    // Handle image upload with enhanced validation
+    // FIXED: Handle image upload with memory storage
     console.log('🖼️ Image upload check - req.file exists:', !!req.file);
     
     if (req.file) {
@@ -122,33 +122,30 @@ const createCourse = async (req, res) => {
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
-        path: req.file.path,
-        fieldname: req.file.fieldname
+        buffer: req.file.buffer ? `Buffer of ${req.file.buffer.length} bytes` : 'No buffer'
       });
 
-      // Validate Cloudinary response
-      if (!req.file.path || typeof req.file.path !== 'string') {
-        console.error('❌ Invalid file path from Cloudinary');
+      try {
+        // Upload to Cloudinary manually
+        console.log('☁️ Uploading to Cloudinary...');
+        const uploadResult = await uploadToCloudinary(req.file.buffer);
+        console.log('✅ Cloudinary upload result:', uploadResult);
+        
+        if (uploadResult && uploadResult.secure_url) {
+          courseData.image = uploadResult.secure_url;
+          console.log('✅ Image URL set successfully:', courseData.image);
+        } else {
+          throw new Error('Cloudinary upload failed - no URL returned');
+        }
+      } catch (uploadError) {
+        console.error('❌ Cloudinary upload error:', uploadError);
         return res.status(400).json({
           success: false,
-          message: 'Image upload failed: Invalid response from Cloudinary'
+          message: `Image upload failed: ${uploadError.message}`
         });
       }
-
-      if (!req.file.path.includes('res.cloudinary.com')) {
-        console.error('❌ Invalid Cloudinary URL:', req.file.path);
-        return res.status(400).json({
-          success: false,
-          message: 'Image upload failed: Invalid Cloudinary URL format'
-        });
-      }
-
-      courseData.image = req.file.path;
-      console.log('✅ Image URL set successfully:', courseData.image);
     } else {
       console.log('❌ No image file provided in req.file');
-      console.log('🔍 Request keys:', Object.keys(req));
-      console.log('🔍 Multer errors:', req.fileValidationError);
       return res.status(400).json({
         success: false,
         message: 'Course image is required'
@@ -203,7 +200,7 @@ const updateCourse = async (req, res) => {
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
-        path: req.file.path
+        buffer: req.file.buffer ? `Buffer of ${req.file.buffer.length} bytes` : 'No buffer'
       } : 'No file'
     })
 
@@ -255,54 +252,47 @@ const updateCourse = async (req, res) => {
       }
     }
 
-    // Handle image upload with strict validation
+    // FIXED: Handle image upload with memory storage
     console.log('🖼️ Image upload check for update - req.file exists:', !!req.file);
     
     if (req.file) {
       console.log('📸 File details for update:', {
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
-        size: req.file.size,
-        path: req.file.path
+        size: req.file.size
       });
 
-      console.log('🔄 Old image URL:', course.image)
-      console.log('🆕 New image path:', req.file.path)
-      
-      // Strict check for empty object or invalid path
-      if (!req.file || Object.keys(req.file).length === 0) {
-        console.error('❌ Empty req.file object received for update');
-        return res.status(400).json({
-          success: false,
-          message: 'Empty file uploaded - Cloudinary failure. Check env vars and redeploy.'
-        });
-      }
-      
-      if (!req.file.path || 
-          typeof req.file.path !== 'string' || 
-          req.file.path.length === 0 || 
-          !req.file.path.includes('res.cloudinary.com')) {
-        console.error('❌ Invalid uploaded file for update - no valid path:', req.file);
-        return res.status(400).json({
-          success: false,
-          message: 'Image upload to Cloudinary failed. Check file size/format and env vars (max 5MB, JPG/PNG).'
-        });
-      }
-      
-      // Delete old image from Cloudinary
-      if (course.image) {
-        try {
-          const publicId = extractPublicId(course.image);
-          console.log('🗑️ Deleting old image with publicId:', publicId)
-          await deleteImage(publicId);
-          console.log('✅ Old image deleted successfully')
-        } catch (error) {
-          console.error('❌ Error deleting old image:', error)
+      try {
+        // Upload to Cloudinary manually
+        console.log('☁️ Uploading to Cloudinary...');
+        const uploadResult = await uploadToCloudinary(req.file.buffer);
+        console.log('✅ Cloudinary upload result:', uploadResult);
+        
+        if (uploadResult && uploadResult.secure_url) {
+          // Delete old image from Cloudinary
+          if (course.image) {
+            try {
+              const publicId = extractPublicId(course.image);
+              console.log('🗑️ Deleting old image with publicId:', publicId)
+              await deleteImage(publicId);
+              console.log('✅ Old image deleted successfully')
+            } catch (error) {
+              console.error('❌ Error deleting old image:', error)
+            }
+          }
+          
+          updateData.image = uploadResult.secure_url;
+          console.log('✅ New image URL set:', updateData.image)
+        } else {
+          throw new Error('Cloudinary upload failed - no URL returned');
         }
+      } catch (uploadError) {
+        console.error('❌ Cloudinary upload error:', uploadError);
+        return res.status(400).json({
+          success: false,
+          message: `Image upload failed: ${uploadError.message}`
+        });
       }
-      
-      updateData.image = req.file.path;
-      console.log('✅ New image URL set:', updateData.image)
     } else {
       console.log('ℹ️ No new image file in request for update')
       // Preserve existing image if no new one and not explicitly removing

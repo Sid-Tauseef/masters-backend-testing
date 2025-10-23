@@ -12,7 +12,7 @@ const validateCloudinaryConfig = () => {
     throw new Error(`Cloudinary configuration missing: ${missing.join(', ')}`);
   }
   
-  console.log('✅ Cloudinary config validated');
+  console.log('✅ Cloudinary config validated - Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME);
 };
 
 validateCloudinaryConfig();
@@ -24,34 +24,46 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Enhanced Cloudinary storage configuration with better error handling
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'masters-academy',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-    transformation: [
-      { width: 1200, height: 800, crop: 'limit', quality: 'auto' }
-    ],
-    timeout: 60000
-  },
-});
+// FIXED: Use memory storage first, then upload to Cloudinary manually
+const memoryStorage = multer.memoryStorage();
 
-// Enhanced multer configuration with better error handling
 const upload = multer({ 
-  storage: storage,
+  storage: memoryStorage,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Check if file is an image
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed (JPEG, PNG, GIF, WebP)'), false);
+      cb(new Error('Only image files are allowed!'), false);
     }
   }
 });
+
+// Manual upload function to Cloudinary
+const uploadToCloudinary = (buffer) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'masters-academy',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        transformation: [
+          { width: 1200, height: 800, crop: 'limit', quality: 'auto' }
+        ]
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      }
+    );
+    
+    uploadStream.end(buffer);
+  });
+};
 
 // Helper function to delete image from Cloudinary
 const deleteImage = async (publicId) => {
@@ -92,6 +104,7 @@ cloudinary.api.ping()
 module.exports = {
   cloudinary,
   upload,
+  uploadToCloudinary,
   deleteImage,
   extractPublicId
 };
